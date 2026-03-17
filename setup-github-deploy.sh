@@ -47,8 +47,9 @@ gcloud iam service-accounts create "$SA_NAME" \
   --display-name="GitHub Actions Deploy" \
   --project="$PROJECT_ID" 2>/dev/null || true
 
-for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/storage.admin \
-  roles/artifactregistry.writer roles/cloudbuild.builds.editor; do
+# serviceusage.serviceUsageConsumer: required so the SA can call enabled APIs (Cloud Build/Run deploy).
+for ROLE in roles/serviceusage.serviceUsageConsumer roles/run.admin roles/iam.serviceAccountUser \
+  roles/storage.admin roles/artifactregistry.writer roles/cloudbuild.builds.editor; do
   echo "Granting $ROLE ..."
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${SA_EMAIL}" \

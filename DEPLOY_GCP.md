@@ -22,17 +22,27 @@ gcloud services enable run.googleapis.com \
   cloudbuild.googleapis.com
 ```
 
-**CI/CD (GitHub Actions):** For `gcloud run deploy --source`, `github-deploy@PROJECT_ID.iam.gserviceaccount.com` needs **Cloud Build**, **Run**, **Artifact Registry**, **Storage**, and **Service Account User**. From the repo root run `./setup-github-deploy.sh` for the full set, or grant missing roles:
+**CI/CD (GitHub Actions):** For `gcloud run deploy --source`, `github-deploy@PROJECT_ID.iam.gserviceaccount.com` needs **Service Usage Consumer** (so APIs can be used), plus **Cloud Build**, **Run**, **Artifact Registry**, **Storage**, and **Service Account User**. From the repo root run `./setup-github-deploy.sh` for the full set, or grant missing roles:
 
 ```bash
 SA="serviceAccount:github-deploy@${PROJECT_ID}.iam.gserviceaccount.com"
-for ROLE in roles/run.admin roles/iam.serviceAccountUser roles/storage.admin \
-  roles/artifactregistry.writer roles/cloudbuild.builds.editor; do
+for ROLE in roles/serviceusage.serviceUsageConsumer roles/run.admin roles/iam.serviceAccountUser \
+  roles/storage.admin roles/artifactregistry.writer roles/cloudbuild.builds.editor; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="$SA" --role="$ROLE" --quiet
 done
 ```
 
-If deploy still fails with `PERMISSION_DENIED`, the **Cloud Build** service account must push images and update Cloud Run:
+If the workflow error mentions **`serviceusage.services.use`** or **Service Usage Consumer**, run (replace `YOUR_GCP_PROJECT_ID`):
+
+```bash
+gcloud projects add-iam-policy-binding YOUR_GCP_PROJECT_ID \
+  --member="serviceAccount:github-deploy@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/serviceusage.serviceUsageConsumer" --quiet
+```
+
+Wait 2–5 minutes for IAM to propagate, then re-run the failed GitHub Action.
+
+If deploy still fails with `PERMISSION_DENIED` (Cloud Build / default service account), the **Cloud Build** service account must push images and update Cloud Run:
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
