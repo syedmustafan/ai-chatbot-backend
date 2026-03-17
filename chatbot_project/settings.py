@@ -109,12 +109,16 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS: allow frontend origins from env
+# CORS: allow frontend origins from env + any Vercel deployment (*.vercel.app)
 CORS_ALLOWED_ORIGINS = config(
     'ALLOWED_ORIGINS',
     default='http://localhost:5174,http://localhost:3000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
+# Allow all Vercel deployment URLs (production and preview) so CORS works without updating ALLOWED_ORIGINS
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^https://[\w-]+\.vercel\.app$',
+]
 
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
