@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+
+# Environment and secrets
+.env
+.env.local
+*.env
+
+# Build and cache
+dist/
+build/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Vite
+frontend/dist/
+
+# Django
+*.sqlite3
+db.sqlite3
+staticfiles/
+media/
