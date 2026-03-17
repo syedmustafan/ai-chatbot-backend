@@ -8,7 +8,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
+# Empty SECRET_KEY from Secret Manager would break signing; never use blank.
+_raw_secret = config('SECRET_KEY', default='') or ''
+SECRET_KEY = _raw_secret.strip() or 'django-insecure-change-me-in-production'
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
@@ -66,9 +68,20 @@ WSGI_APPLICATION = 'chatbot_project.wsgi.application'
 # Use DATABASE_URL (e.g. Cloud SQL PostgreSQL) if set; otherwise SQLite
 # On Cloud Run, use /tmp for SQLite so the DB is writable (ephemeral)
 import os
-DATABASE_URL = config('DATABASE_URL', default='')
+DATABASE_URL = (config('DATABASE_URL', default='') or '').strip()
 if DATABASE_URL:
-    DATABASES = {'default': dj_database_url.config(conn_max_age=600, ssl_require=True)}
+    # Cloud SQL via Unix socket (?host=/cloudsql/...) does not use TLS like a public IP connection.
+    _use_ssl = '/cloudsql/' not in DATABASE_URL
+    db = dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600,
+        ssl_require=_use_ssl,
+    )
+    db.setdefault('OPTIONS', {})
+    # Fail fast so migrate cannot hang past Cloud Run startup (hung DB = no listener on PORT).
+    if db.get('ENGINE') == 'django.db.backends.postgresql':
+        db['OPTIONS'].setdefault('connect_timeout', 15)
+    DATABASES = {'default': db}
 else:
     sqlite_path = BASE_DIR / 'db.sqlite3'
     if os.environ.get('PORT'):  # Cloud Run sets PORT

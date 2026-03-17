@@ -62,6 +62,7 @@ jobs:
             --region="$GCP_REGION" \
             --platform=managed \
             --allow-unauthenticated \
+            --cpu-boost \
             --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest" \
             --env-vars-file="$ENV_FILE" \
             --project="$GCP_PROJECT_ID"
