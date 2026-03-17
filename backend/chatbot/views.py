@@ -1,6 +1,9 @@
 """
 Chat API view.
 """
+# Backend deploy via CI/CD on push to prod/main
+import datetime
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
@@ -39,6 +42,15 @@ class ChatbotView(APIView):
     """
 
     def post(self, request):
+        try:
+            return self._handle_post(request)
+        except Exception as e:
+            return Response(
+                {"success": False, "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _handle_post(self, request):
         serializer = ChatRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
@@ -79,8 +91,8 @@ class ChatbotView(APIView):
         )
         ts = timezone.now()
         if timezone.is_naive(ts):
-            ts = timezone.make_aware(ts, timezone.UTC)
-        ts = ts.astimezone(timezone.UTC)
+            ts = timezone.make_aware(ts, datetime.timezone.utc)
+        ts = ts.astimezone(datetime.timezone.utc)
         timestamp_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
         return Response(
             {
