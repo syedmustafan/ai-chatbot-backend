@@ -1,8 +1,25 @@
 # AI Chatbot — Backend
 
+[![Deploy Backend to GCP](https://github.com/syedmustafan/ai-chatbot-backend/actions/workflows/deploy-backend.yml/badge.svg)](https://github.com/syedmustafan/ai-chatbot-backend/actions/workflows/deploy-backend.yml)
+
 Django REST API for the AI Chatbot. Handles chat messages, conversation history, and OpenAI integration.
 
-**Frontend repo:** [ai-chatbot-frontend](https://github.com/syedmustafan/ai-chatbot-frontend) — React UI that consumes this API.
+**Repo:** [github.com/syedmustafan/ai-chatbot-backend](https://github.com/syedmustafan/ai-chatbot-backend) (backend-only; use from repo root).
+
+## Deploy to Google Cloud (CI/CD)
+
+1. Enable APIs and create Secret Manager secrets — see **[DEPLOY_GCP.md](./DEPLOY_GCP.md)**.
+2. From **this repo root** (same folder as `manage.py`):
+
+   ```bash
+   ./setup-github-deploy.sh
+   ```
+
+   Requires [gcloud](https://cloud.google.com/sdk) and [GitHub CLI](https://cli.github.com/) (`gh auth login` in this repo).
+
+3. Push to **`main`** or **`prod`** — GitHub Actions deploys to Cloud Run (workflow: `.github/workflows/deploy-backend.yml`).
+
+Manual one-off deploy: `./deploy-to-gcp.sh` (from repo root, after `gcloud auth` and secrets exist).
 
 ## Prerequisites
 

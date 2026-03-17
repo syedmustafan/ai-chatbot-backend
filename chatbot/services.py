@@ -27,7 +27,7 @@ class OpenAIService:
         api_key = config('OPENAI_API_KEY', default=None)
         if not api_key:
             raise OpenAIServiceError("OPENAI_API_KEY is not set in environment.")
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=api_key.strip())
         self.model = config('OPENAI_MODEL', default='gpt-3.5-turbo')
         self.system_prompt = config('OPENAI_SYSTEM_PROMPT', default=DEFAULT_SYSTEM_PROMPT)
 

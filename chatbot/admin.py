@@ -8,7 +8,6 @@ class ConversationAdmin(admin.ModelAdmin):
     readonly_fields = ('id', 'created_at', 'updated_at')
 
 
-
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin):
     list_display = ('id', 'conversation', 'user_message', 'timestamp')

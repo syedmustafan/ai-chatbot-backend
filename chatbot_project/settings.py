@@ -4,6 +4,7 @@ Django settings for chatbot_project project.
 
 from pathlib import Path
 from decouple import config
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -56,12 +57,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'chatbot_project.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Use DATABASE_URL (e.g. Cloud SQL PostgreSQL) if set; otherwise SQLite
+# On Cloud Run, use /tmp for SQLite so the DB is writable (ephemeral)
+import os
+DATABASE_URL = config('DATABASE_URL', default='')
+if DATABASE_URL:
+    DATABASES = {'default': dj_database_url.config(conn_max_age=600, ssl_require=True)}
+else:
+    sqlite_path = BASE_DIR / 'db.sqlite3'
+    if os.environ.get('PORT'):  # Cloud Run sets PORT
+        sqlite_path = Path('/tmp/db.sqlite3')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': sqlite_path,
+        }
     }
-}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -76,6 +87,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS: allow frontend origins from env
