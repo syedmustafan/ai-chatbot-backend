@@ -186,3 +186,9 @@ Or run migrations locally with Cloud SQL Proxy and `DATABASE_URL` set to the pro
 | DATABASE_URL   | PostgreSQL URL (if Cloud SQL)  | Secret or env (build from DB_* + socket) |
 
 After deployment, set the frontend’s `VITE_API_URL` (e.g. in Vercel) to the Cloud Run service URL.
+
+## Troubleshooting: “failed to start and listen on PORT=8080”
+
+1. **Bind address** — Gunicorn must listen on **`0.0.0.0`**, not only `127.0.0.1`. This repo’s `entrypoint.sh` uses `--bind "0.0.0.0:${PORT}"`.
+2. **`migrate` failing** — If the container exits before Gunicorn starts, check revision logs: DB URL / network (e.g. Cloud SQL) can make `migrate` hang or fail.
+3. **`ALLOWED_HOSTS: "*"`** — Django does not accept a literal `*` for all hosts. For Cloud Run, use `.run.app` (handled automatically when you set `ALLOWED_HOSTS` to `*` in the workflow) or list real hostnames.

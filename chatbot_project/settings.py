@@ -12,7 +12,13 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-producti
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+# Cloud Run: Host is e.g. *.run.app. Django does not treat literal "*" as "allow all".
+_allowed_raw = config('ALLOWED_HOSTS', default='localhost,127.0.0.1')
+_allowed_parts = [s.strip() for s in _allowed_raw.split(',') if s.strip()]
+if _allowed_parts == ['*']:
+    ALLOWED_HOSTS = ['.run.app', '127.0.0.1', 'localhost']
+else:
+    ALLOWED_HOSTS = _allowed_parts
 
 INSTALLED_APPS = [
     'django.contrib.admin',
