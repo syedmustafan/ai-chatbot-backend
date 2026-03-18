@@ -242,6 +242,8 @@ In production the leads list requires a shared secret:
 
 Without `LEADS_API_KEY` on Cloud Run, the API returns *“Leads API requires LEADS_API_KEY in production”* even if the client sends a key.
 
+**500 on `/api/leads/` with SQLite:** The default deploy without `DATABASE_URL` uses SQLite on `/tmp` with **one Gunicorn worker** (multi-worker + SQLite causes `database is locked`). For real traffic, use **PostgreSQL** (Cloud SQL + `DATABASE_URL`) so you can scale workers safely.
+
 **Manual Cloud Run update** (if not using the new workflow yet):
 
 ```bash

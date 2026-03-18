@@ -37,9 +37,18 @@ while [ "$attempt" -le "$max_attempts" ]; do
   attempt=$((attempt + 1))
 done
 
+# SQLite allows only one writer; multiple Gunicorn workers cause random 500s
+# ("database is locked") on /api/chat/ and /api/leads/ under concurrent traffic.
+_db_url="${DATABASE_URL:-}"
+case "$_db_url" in
+  ''|*sqlite*) WORKERS=1 ;;
+  *) WORKERS=2 ;;
+esac
+echo "entrypoint: gunicorn workers=$WORKERS (SQLite needs 1; Postgres can use 2+)"
+
 exec python -m gunicorn \
   --bind "0.0.0.0:${PORT}" \
-  --workers 2 \
+  --workers "$WORKERS" \
   --threads 8 \
   --timeout 0 \
   --access-logfile - \

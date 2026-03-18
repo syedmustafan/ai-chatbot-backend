@@ -91,6 +91,8 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': sqlite_path,
+            # Reduce "database is locked" under brief contention (still use Postgres for prod).
+            'OPTIONS': {'timeout': 30},
         }
     }
 
@@ -127,6 +129,22 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
+}
+
+# Surface 500 tracebacks in Cloud Run (stderr → Cloud Logging)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
 }
 
 # Optional: protect GET /api/leads/ — required when DEBUG=False; optional when DEBUG=True (local dev)
