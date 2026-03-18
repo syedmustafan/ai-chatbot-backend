@@ -3,6 +3,7 @@
 # Secrets: GCP_PROJECT_ID, GCP_SA_KEY (see ./setup-github-deploy.sh)
 # Optional: GCP_REGION, GCP_SERVICE_NAME, ALLOWED_ORIGINS
 # Optional (Twilio phone): GitHub secrets PUBLIC_BASE_URL, TWILIO_AUTH_TOKEN
+# Leads dashboard API: GitHub secret LEADS_API_KEY (same value as frontend VITE_LEADS_API_KEY)
 
 name: Deploy Backend to GCP
 
@@ -56,6 +57,7 @@ jobs:
           MOUNT_DATABASE_URL: ${{ secrets.MOUNT_DATABASE_URL }}
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          LEADS_API_KEY: ${{ secrets.LEADS_API_KEY }}
         run: |
           ENV_FILE=$(mktemp)
           trap "rm -f $ENV_FILE" EXIT
@@ -69,6 +71,9 @@ jobs:
           fi
           if [ -n "${TWILIO_AUTH_TOKEN:-}" ]; then
             printf 'TWILIO_AUTH_TOKEN: "%s"\n' "$TWILIO_AUTH_TOKEN" >> "$ENV_FILE"
+          fi
+          if [ -n "${LEADS_API_KEY:-}" ]; then
+            python3 -c "import json,os; p=os.environ['E']; k=os.environ['K']; open(p,'a').write('LEADS_API_KEY: '+json.dumps(k)+chr(10))" E="$ENV_FILE" K="$LEADS_API_KEY"
           fi
           SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest"
           EXTRA_FLAGS=""

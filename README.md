@@ -17,9 +17,11 @@ Django REST API for **move booking intake**: web chat and **Twilio Voice** (spee
 
    Requires [gcloud](https://cloud.google.com/sdk) and [GitHub CLI](https://cli.github.com/) (`gh auth login` in this repo).
 
-3. Push to **`main`** or **`prod`** — GitHub Actions deploys to Cloud Run (workflow: `.github/workflows/deploy-backend.yml`).
+3. Add GitHub secret **`LEADS_API_KEY`** (same value as frontend `VITE_LEADS_API_KEY`) so `GET /api/leads/` works in production — see **Leads API** in [DEPLOY_GCP.md](./DEPLOY_GCP.md).
+4. Push to **`main`** or **`prod`** — GitHub Actions deploys to Cloud Run (workflow: `.github/workflows/deploy-backend.yml`).
 
-Manual one-off deploy: `./deploy-to-gcp.sh` (from repo root, after `gcloud auth` and secrets exist).
+Manual one-off deploy: `./deploy-to-gcp.sh` (from repo root, after `gcloud auth` and secrets exist).  
+If the leads page 403s in prod, set **`LEADS_API_KEY`** on Cloud Run (or the GitHub secret above).
 
 ## Prerequisites
 
@@ -72,6 +74,7 @@ API will be at `http://localhost:8000`. Chat endpoint: `POST /api/chat/`.
 | `DEBUG`            | No       | Debug mode (default: True)                       |
 | `OPENAI_MODEL`     | No       | Model name (default: gpt-3.5-turbo)              |
 | `OPENAI_SYSTEM_PROMPT` | No  | Custom system prompt for the assistant           |
+| `LEADS_API_KEY`    | No†      | Required when `DEBUG=False` for `GET /api/leads/`; match frontend `VITE_LEADS_API_KEY` |
 
 ## API
 

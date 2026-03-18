@@ -228,8 +228,26 @@ Or run migrations locally with [Cloud SQL Auth Proxy](https://cloud.google.com/s
 | DATABASE_URL   | PostgreSQL URL (if Cloud SQL)  | Secret or env (build from DB_* + socket) |
 | PUBLIC_BASE_URL| **HTTPS** origin of this API (no trailing slash), e.g. `https://your-service-xxxxx.run.app` | `--update-env-vars` — **required for Twilio webhooks** |
 | TWILIO_AUTH_TOKEN | Twilio Auth Token (validates webhook signatures) | Secret Manager or env |
+| LEADS_API_KEY | Protects `GET /api/leads/` (must match frontend `VITE_LEADS_API_KEY`) | GitHub secret → deploy env, or `--update-env-vars` |
 
 After deployment, set the frontend’s `VITE_API_URL` (e.g. in Vercel) to the Cloud Run service URL.
+
+### Leads API (`GET /api/leads/`)
+
+In production the leads list requires a shared secret:
+
+1. Choose a long random string (e.g. `openssl rand -hex 16`).
+2. **GitHub** (backend repo): add repository secret **`LEADS_API_KEY`** with that value, then redeploy (`main` / `prod`). The workflow passes it to Cloud Run.
+3. **Vercel** (frontend): set **`VITE_LEADS_API_KEY`** to the **same** value and redeploy the frontend so requests include `X-API-Key`.
+
+Without `LEADS_API_KEY` on Cloud Run, the API returns *“Leads API requires LEADS_API_KEY in production”* even if the client sends a key.
+
+**Manual Cloud Run update** (if not using the new workflow yet):
+
+```bash
+gcloud run services update "$SERVICE_NAME" --region="$REGION" --project="$PROJECT_ID" \
+  --update-env-vars="LEADS_API_KEY=YOUR_SAME_SECRET_AS_FRONTEND"
+```
 
 ## 8. Twilio inbound voice (AI phone intake)
 
