@@ -159,20 +159,62 @@ gcloud run deploy "$SERVICE_NAME" \
 
 After deploy, note the **Service URL** (e.g. `https://ai-chatbot-backend-xxxxx-uc.a.run.app`). Use it as the frontend `VITE_API_URL`.
 
-## 6. Run migrations (if using Cloud SQL)
+## 6. Migrations
 
-If you use Cloud SQL, run migrations once (e.g. from Cloud Build or a one-off Cloud Run job):
+**On every container start**, `entrypoint.sh` runs `python manage.py migrate`. If migrations fail (wrong `DATABASE_URL`, Cloud SQL not attached, IAM), the **revision fails to start** so you fix config instead of serving a broken API.
+
+### Fix: `no such table: chatbot_conversation`
+
+That message is from **SQLite**: Cloud Run had **no `DATABASE_URL`**, so Django used ephemeral `/tmp/db.sqlite3`. If migrate ever failed, the old entrypoint still started the web server → empty DB → missing tables.
+
+**Do this for production:**
+
+1. **Create Cloud SQL Postgres** (§4) and note `CONNECTION_NAME` (`project:region:instance`).
+
+2. **Store `DATABASE_URL` in Secret Manager** (password URL-encoded if it has special chars):
+
+   ```bash
+   # Example socket URL for Cloud SQL Auth:
+   echo -n 'postgres://chatbot_user:YOUR_PASSWORD@/chatbot?host=/cloudsql/PROJECT_ID:REGION:INSTANCE_NAME' | \
+     gcloud secrets create DATABASE_URL --data-file=- --project="$PROJECT_ID" 2>/dev/null || \
+     echo -n 'postgres://...' | gcloud secrets versions add DATABASE_URL --data-file=-
+   ```
+
+3. **Grant the Cloud Run service account** access to the secret and Cloud SQL:
+
+   ```bash
+   PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+   RUN_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+   gcloud secrets add-iam-policy-binding DATABASE_URL \
+     --member="serviceAccount:${RUN_SA}" --role="roles/secretmanager.secretAccessor" --project="$PROJECT_ID"
+   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+     --member="serviceAccount:${RUN_SA}" --role="roles/cloudsql.client" --quiet
+   ```
+
+4. **Wire deploy (GitHub Actions):** add repository secret **`GCLOUD_SQL_INSTANCE`** = your `PROJECT:REGION:INSTANCE` (same as connection name). The workflow mounts `DATABASE_URL` and `--add-cloudsql-instances`. Push to `main`/`prod` to redeploy.
+
+5. **Or patch Cloud Run once from CLI** (then add secrets to CI so the next deploy does not drop them):
+
+   ```bash
+   gcloud run services update ai-chatbot-backend --region="$REGION" --project="$PROJECT_ID" \
+     --add-cloudsql-instances="PROJECT:REGION:INSTANCE" \
+     --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest" \
+     --update-env-vars="DEBUG=False,ALLOWED_HOSTS=*,ALLOWED_ORIGINS=https://your-app.vercel.app"
+   ```
+
+   Redeploy or wait for a new revision; startup will run migrations on Postgres.
+
+### One-off migrate job (optional)
+
+From repo root, after the service image exists:
 
 ```bash
-# One-off job or use Cloud Shell with Cloud SQL Proxy
-gcloud run jobs create chatbot-migrate --image=YOUR_IMAGE_URL --region="$REGION" \
-  --set-secrets="SECRET_KEY=DJANGO_SECRET_KEY:latest,DATABASE_URL=DATABASE_URL:latest" \
-  --command="python" --args="manage.py,migrate,--noinput"
-# Then run the job:
-# gcloud run jobs execute chatbot-migrate --region="$REGION"
+export GCP_PROJECT_ID=YOUR_PROJECT_ID
+export CLOUD_SQL_INSTANCE=PROJECT:REGION:INSTANCE
+./scripts/run-migrations-cloud-run-job.sh
 ```
 
-Or run migrations locally with Cloud SQL Proxy and `DATABASE_URL` set to the proxy.
+Or run migrations locally with [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/connect-auth-proxy) and `DATABASE_URL` pointing at `127.0.0.1`.
 
 ## 7. Summary of secret env vars in GCP
 
@@ -184,8 +226,34 @@ Or run migrations locally with Cloud SQL Proxy and `DATABASE_URL` set to the pro
 | ALLOWED_HOSTS  | e.g. `*` or your domain        | `--set-env-vars`                       |
 | ALLOWED_ORIGINS| Frontend URLs for CORS         | `--set-env-vars`                       |
 | DATABASE_URL   | PostgreSQL URL (if Cloud SQL)  | Secret or env (build from DB_* + socket) |
+| PUBLIC_BASE_URL| **HTTPS** origin of this API (no trailing slash), e.g. `https://your-service-xxxxx.run.app` | `--update-env-vars` — **required for Twilio webhooks** |
+| TWILIO_AUTH_TOKEN | Twilio Auth Token (validates webhook signatures) | Secret Manager or env |
 
 After deployment, set the frontend’s `VITE_API_URL` (e.g. in Vercel) to the Cloud Run service URL.
+
+## 8. Twilio inbound voice (AI phone intake)
+
+1. **Env on Cloud Run** (in addition to the table above):
+   - `PUBLIC_BASE_URL` = your service URL, e.g. `https://ai-chatbot-backend-xxxxx-uc.a.run.app` (must match what Twilio calls — no path).
+   - `TWILIO_AUTH_TOKEN` = from [Twilio Console](https://console.twilio.com/) (keep secret).
+
+2. **Twilio Console**
+   - Buy a voice-capable number (check [Twilio voice coverage](https://www.twilio.com/voice) for your country).
+   - **Phone number → Voice configuration → A call comes in**: Webhook, **POST**, URL:
+     - `https://YOUR_HOST/api/twilio/voice/incoming/`
+   - Save.
+
+3. **Flow**
+   - Twilio hits `incoming/` → Django creates a **Lead** (`source=phone`) and returns TwiML: **Say** + **Gather** (speech).
+   - Each utterance POSTs to `gather/` → same intake LLM as web → **Say** + **Gather** until all fields are filled, then **Say** + **Hangup**.
+   - Leads appear in Django **admin** (`/admin/`).
+
+4. **Local testing**
+   - Use [ngrok](https://ngrok.com/) (or similar) HTTPS URL as `PUBLIC_BASE_URL` and set the Twilio webhook to your tunnel + `/api/twilio/voice/incoming/`.
+   - If `TWILIO_AUTH_TOKEN` is unset and `DEBUG=True`, signature checks are skipped (dev only).
+
+5. **Model**
+   - Use a model that supports JSON mode (e.g. `gpt-4o-mini`) via `OPENAI_MODEL` for reliable field extraction.
 
 ## Troubleshooting: “failed to start and listen on PORT=8080”
 

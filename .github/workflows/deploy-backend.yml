@@ -2,6 +2,7 @@
 # Repo: https://github.com/syedmustafan/ai-chatbot-backend
 # Secrets: GCP_PROJECT_ID, GCP_SA_KEY (see ./setup-github-deploy.sh)
 # Optional: GCP_REGION, GCP_SERVICE_NAME, ALLOWED_ORIGINS
+# Optional (Twilio phone): GitHub secrets PUBLIC_BASE_URL, TWILIO_AUTH_TOKEN
 
 name: Deploy Backend to GCP
 
@@ -49,6 +50,12 @@ jobs:
           GCP_REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
           GCP_SERVICE_NAME: ${{ secrets.GCP_SERVICE_NAME || 'ai-chatbot-backend' }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS || 'https://frontend-two-hazel-29.vercel.app,https://ai-chatbot-frontend.vercel.app' }}
+          # Optional: Cloud SQL connection name PROJECT:REGION:INSTANCE — enables DATABASE_URL + socket
+          GCLOUD_SQL_INSTANCE: ${{ secrets.GCLOUD_SQL_INSTANCE }}
+          # Set to "1" or "true" to mount Secret Manager DATABASE_URL without Cloud SQL (e.g. Neon/hosted Postgres).
+          MOUNT_DATABASE_URL: ${{ secrets.MOUNT_DATABASE_URL }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
         run: |
           ENV_FILE=$(mktemp)
           trap "rm -f $ENV_FILE" EXIT
@@ -57,15 +64,38 @@ jobs:
           ALLOWED_HOSTS: "*"
           ALLOWED_ORIGINS: "$ALLOWED_ORIGINS"
           EOF
+          if [ -n "${PUBLIC_BASE_URL:-}" ]; then
+            printf 'PUBLIC_BASE_URL: "%s"\n' "$PUBLIC_BASE_URL" >> "$ENV_FILE"
+          fi
+          if [ -n "${TWILIO_AUTH_TOKEN:-}" ]; then
+            printf 'TWILIO_AUTH_TOKEN: "%s"\n' "$TWILIO_AUTH_TOKEN" >> "$ENV_FILE"
+          fi
+          SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest"
+          EXTRA_FLAGS=""
+          USE_DB_URL=false
+          if [ -n "$GCLOUD_SQL_INSTANCE" ]; then
+            USE_DB_URL=true
+            EXTRA_FLAGS="--add-cloudsql-instances=${GCLOUD_SQL_INSTANCE}"
+            echo "Deploying with Cloud SQL instance: $GCLOUD_SQL_INSTANCE"
+          elif [ "$MOUNT_DATABASE_URL" = "1" ] || [ "$MOUNT_DATABASE_URL" = "true" ]; then
+            USE_DB_URL=true
+            echo "Mounting DATABASE_URL from Secret Manager (no Cloud SQL attachment)."
+          fi
+          if [ "$USE_DB_URL" = true ]; then
+            SECRETS="${SECRETS},DATABASE_URL=DATABASE_URL:latest"
+          else
+            echo "No managed DB: GCLOUD_SQL_INSTANCE / MOUNT_DATABASE_URL unset — SQLite on /tmp (resets per instance; not for prod)."
+          fi
           gcloud run deploy "$GCP_SERVICE_NAME" \
             --source . \
             --region="$GCP_REGION" \
             --platform=managed \
             --allow-unauthenticated \
             --cpu-boost \
-            --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest" \
+            --set-secrets="$SECRETS" \
             --env-vars-file="$ENV_FILE" \
-            --project="$GCP_PROJECT_ID"
+            --project="$GCP_PROJECT_ID" \
+            $EXTRA_FLAGS
 
       - name: Output service URL
         env:

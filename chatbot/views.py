@@ -1,7 +1,6 @@
 """
-Chat API view.
+Chat API view (web intake).
 """
-# Backend deploy via CI/CD on push to prod/main
 import datetime
 
 from django.utils import timezone
@@ -10,8 +9,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from .serializers import ChatRequestSerializer
-from .services import OpenAIService, OpenAIServiceError
-from .models import Conversation, Message
+from .services import OpenAIServiceError
+from .intake_service import run_intake_turn
+from .models import Conversation, Message, Lead
 
 
 def get_or_create_conversation(conversation_id=None):
@@ -29,7 +29,8 @@ def get_conversation_history(conversation, max_messages=20):
     messages = conversation.messages.order_by('timestamp')[:max_messages]
     history = []
     for m in messages:
-        history.append({"role": "user", "content": m.user_message})
+        if m.user_message and m.user_message not in ('__CALL_START__',):
+            history.append({"role": "user", "content": m.user_message})
         if m.ai_response:
             history.append({"role": "assistant", "content": m.ai_response})
     return history
@@ -65,19 +66,26 @@ class ChatbotView(APIView):
             )
         conversation_id = serializer.validated_data.get("conversation_id")
 
-        try:
-            openai_service = OpenAIService()
-        except OpenAIServiceError as e:
+        conversation = get_or_create_conversation(conversation_id)
+        lead, _ = Lead.objects.get_or_create(
+            conversation=conversation,
+            defaults={"source": Lead.Source.WEB},
+        )
+        if lead.source != Lead.Source.WEB:
             return Response(
-                {"success": False, "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"success": False, "error": "This conversation is not a web session."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        conversation = get_or_create_conversation(conversation_id)
         history = get_conversation_history(conversation)
 
         try:
-            ai_response = openai_service.send_message(message, conversation_history=history)
+            ai_response, missing = run_intake_turn(
+                user_message=message,
+                history=history,
+                lead=lead,
+                channel="web",
+            )
         except OpenAIServiceError as e:
             return Response(
                 {"success": False, "error": str(e)},
@@ -89,6 +97,7 @@ class ChatbotView(APIView):
             user_message=message,
             ai_response=ai_response,
         )
+        lead.refresh_from_db()
         ts = timezone.now()
         if timezone.is_naive(ts):
             ts = timezone.make_aware(ts, datetime.timezone.utc)
@@ -100,6 +109,8 @@ class ChatbotView(APIView):
                 "response": ai_response,
                 "conversation_id": str(conversation.id),
                 "timestamp": timestamp_str,
+                "lead_status": lead.status,
+                "missing_fields": missing,
             },
             status=status.HTTP_200_OK,
         )

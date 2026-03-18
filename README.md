@@ -2,7 +2,7 @@
 
 [![Deploy Backend to GCP](https://github.com/syedmustafan/ai-chatbot-backend/actions/workflows/deploy-backend.yml/badge.svg)](https://github.com/syedmustafan/ai-chatbot-backend/actions/workflows/deploy-backend.yml)
 
-Django REST API for the AI Chatbot. Handles chat messages, conversation history, and OpenAI integration.
+Django REST API for **move booking intake**: web chat and **Twilio Voice** (speech → same LLM). Stores **leads** (name, email, phone, job type) in the database. See [DEPLOY_GCP.md](./DEPLOY_GCP.md) §8 for Twilio setup.
 
 **Repo:** [github.com/syedmustafan/ai-chatbot-backend](https://github.com/syedmustafan/ai-chatbot-backend) (backend-only; use from repo root).
 

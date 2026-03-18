@@ -1,23 +1,41 @@
 #!/bin/sh
-# Cloud Run: bind 0.0.0.0:$PORT. Migrate must not hang forever (unreachable DB blocks the port).
+# Cloud Run: bind 0.0.0.0:$PORT. Migrations must succeed before serving traffic.
 set -eu
 PORT="${PORT:-8080}"
 export PORT
 
-echo "entrypoint: PORT=$PORT"
+echo "entrypoint: PORT=$PORT DATABASE_URL=${DATABASE_URL:+set}${DATABASE_URL:-unset}"
 
-set +e
-if command -v timeout >/dev/null 2>&1; then
-  timeout 180 python manage.py migrate --noinput
-else
-  python manage.py migrate --noinput
-fi
-migrate_status=$?
-set -e
+run_migrate_once() {
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 120 python manage.py migrate --noinput
+  else
+    python manage.py migrate --noinput
+  fi
+}
 
-if [ "$migrate_status" -ne 0 ]; then
-  echo "entrypoint: migrate exited $migrate_status (timed out, failed, or DB unreachable) — starting web server anyway"
-fi
+# Cloud SQL socket can be slow on cold start; retry before failing the revision.
+max_attempts=5
+attempt=1
+while [ "$attempt" -le "$max_attempts" ]; do
+  echo "entrypoint: migrate attempt $attempt/$max_attempts"
+  set +e
+  run_migrate_once
+  migrate_status=$?
+  set -e
+  if [ "$migrate_status" -eq 0 ]; then
+    echo "entrypoint: migrate OK"
+    break
+  fi
+  echo "entrypoint: migrate exited $migrate_status"
+  if [ "$attempt" -eq "$max_attempts" ]; then
+    echo "entrypoint: FATAL — migrations failed after $max_attempts attempts."
+    echo "entrypoint: If using Cloud SQL: set DATABASE_URL secret, attach instance (--add-cloudsql-instances), grant Cloud Run SA roles/cloudsql.client"
+    exit 1
+  fi
+  sleep $((attempt * 4))
+  attempt=$((attempt + 1))
+done
 
 exec python -m gunicorn \
   --bind "0.0.0.0:${PORT}" \
