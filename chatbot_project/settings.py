@@ -125,3 +125,6 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.JSONRenderer',
     ],
 }
+
+# Optional: protect GET /api/leads/ — required when DEBUG=False; optional when DEBUG=True (local dev)
+LEADS_API_KEY = (config('LEADS_API_KEY', default='') or '').strip()

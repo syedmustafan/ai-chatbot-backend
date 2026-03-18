@@ -3,12 +3,14 @@ Chat API view (web intake).
 """
 import datetime
 
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .serializers import ChatRequestSerializer
+from .serializers import ChatRequestSerializer, LeadSerializer
 from .services import OpenAIServiceError
 from .intake_service import run_intake_turn
 from .models import Conversation, Message, Lead
@@ -114,3 +116,49 @@ class ChatbotView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class LeadsPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+def _leads_api_authorized(request) -> bool:
+    key = getattr(settings, 'LEADS_API_KEY', '') or ''
+    if not key:
+        return bool(settings.DEBUG)
+    auth = (request.headers.get('Authorization') or '').strip()
+    if auth.lower().startswith('bearer '):
+        token = auth[7:].strip()
+        if token == key:
+            return True
+    return (request.headers.get('X-API-Key') or '').strip() == key
+
+
+class LeadsListView(APIView):
+    """
+    GET /api/leads/
+    Paginated list of intake leads (newest first).
+
+    When DEBUG is False, set LEADS_API_KEY and send it as:
+    Header: X-API-Key: <key> or Authorization: Bearer <key>
+    """
+
+    def get(self, request):
+        if not _leads_api_authorized(request):
+            if not getattr(settings, 'LEADS_API_KEY', ''):
+                return Response(
+                    {
+                        'detail': 'Leads API requires LEADS_API_KEY in production (DEBUG=False). '
+                        'Set LEADS_API_KEY and pass X-API-Key or Authorization: Bearer <key>.',
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            return Response({'detail': 'Invalid or missing API key.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        queryset = Lead.objects.select_related('conversation').all().order_by('-updated_at')
+        paginator = LeadsPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = LeadSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
