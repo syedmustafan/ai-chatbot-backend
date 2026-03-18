@@ -73,7 +73,7 @@ jobs:
             printf 'TWILIO_AUTH_TOKEN: "%s"\n' "$TWILIO_AUTH_TOKEN" >> "$ENV_FILE"
           fi
           if [ -n "${LEADS_API_KEY:-}" ]; then
-            python3 -c "import json,os; p=os.environ['E']; k=os.environ['K']; open(p,'a').write('LEADS_API_KEY: '+json.dumps(k)+chr(10))" E="$ENV_FILE" K="$LEADS_API_KEY"
+            E="$ENV_FILE" K="$LEADS_API_KEY" python3 -c "import json,os; p=os.environ['E']; k=os.environ['K']; open(p,'a').write('LEADS_API_KEY: '+json.dumps(k)+chr(10))"
           fi
           SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest"
           EXTRA_FLAGS=""
