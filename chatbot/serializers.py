@@ -9,7 +9,8 @@ from .models import Lead
 class LeadSerializer(serializers.ModelSerializer):
     """Expose lead intake fields for the leads dashboard API."""
 
-    conversation_id = serializers.UUIDField(source='conversation_id', read_only=True)
+    # DRF 3.14+: source must not duplicate the field name (AssertionError on .data).
+    conversation_id = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = Lead
