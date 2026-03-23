@@ -50,7 +50,7 @@ jobs:
         env:
           GCP_REGION: ${{ secrets.GCP_REGION || 'us-central1' }}
           GCP_SERVICE_NAME: ${{ secrets.GCP_SERVICE_NAME || 'ai-chatbot-backend' }}
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS || 'https://frontend-two-hazel-29.vercel.app,https://ai-chatbot-frontend.vercel.app' }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS || 'https://ai-chatbot-frontend-nu.vercel.app,https://ai-chatbot-frontend.vercel.app' }}
           # Optional: Cloud SQL connection name PROJECT:REGION:INSTANCE — enables DATABASE_URL + socket
           GCLOUD_SQL_INSTANCE: ${{ secrets.GCLOUD_SQL_INSTANCE }}
           # Set to "1" or "true" to mount Secret Manager DATABASE_URL without Cloud SQL (e.g. Neon/hosted Postgres).
