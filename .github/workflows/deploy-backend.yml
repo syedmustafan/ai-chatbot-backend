@@ -75,7 +75,7 @@ jobs:
           if [ -n "${LEADS_API_KEY:-}" ]; then
             E="$ENV_FILE" K="$LEADS_API_KEY" python3 -c "import json,os; p=os.environ['E']; k=os.environ['K']; open(p,'a').write('LEADS_API_KEY: '+json.dumps(k)+chr(10))"
           fi
-          SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest"
+          SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
           EXTRA_FLAGS=""
           USE_DB_URL=false
           if [ -n "$GCLOUD_SQL_INSTANCE" ]; then
