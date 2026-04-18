@@ -14,7 +14,23 @@ on:
       - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Run docforge tests
+        env:
+          SECRET_KEY: test-secret
+          DEBUG: 'True'
+        run: python manage.py test docforge --noinput
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     env:
       GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
@@ -58,6 +74,7 @@ jobs:
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           LEADS_API_KEY: ${{ secrets.LEADS_API_KEY }}
+          GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
         run: |
           ENV_FILE=$(mktemp)
           trap "rm -f $ENV_FILE" EXIT
@@ -66,6 +83,10 @@ jobs:
           ALLOWED_HOSTS: "*"
           ALLOWED_ORIGINS: "$ALLOWED_ORIGINS"
           EOF
+          if [ -n "${GCS_BUCKET:-}" ]; then
+            printf 'USE_GCS: "True"\n' >> "$ENV_FILE"
+            printf 'GS_BUCKET_NAME: "%s"\n' "$GCS_BUCKET" >> "$ENV_FILE"
+          fi
           if [ -n "${PUBLIC_BASE_URL:-}" ]; then
             printf 'PUBLIC_BASE_URL: "%s"\n' "$PUBLIC_BASE_URL" >> "$ENV_FILE"
           fi
@@ -75,7 +96,7 @@ jobs:
           if [ -n "${LEADS_API_KEY:-}" ]; then
             E="$ENV_FILE" K="$LEADS_API_KEY" python3 -c "import json,os; p=os.environ['E']; k=os.environ['K']; open(p,'a').write('LEADS_API_KEY: '+json.dumps(k)+chr(10))"
           fi
-          SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
+          SECRETS="OPENAI_API_KEY=OPENAI_API_KEY:latest,SECRET_KEY=DJANGO_SECRET_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DOCFORGE_CLEANUP_TOKEN=DOCFORGE_CLEANUP_TOKEN:latest"
           EXTRA_FLAGS=""
           USE_DB_URL=false
           if [ -n "$GCLOUD_SQL_INSTANCE" ]; then

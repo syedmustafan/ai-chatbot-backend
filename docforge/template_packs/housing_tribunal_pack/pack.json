@@ -1,0 +1,28 @@
+{
+  "key": "housing_tribunal_pack",
+  "display_name": "Housing Tribunal Pack",
+  "required_fields": [
+    "tenant_name",
+    "address",
+    "postal_code",
+    "rent_amount",
+    "arrears_amount"
+  ],
+  "templates": [
+    {
+      "key": "legal_form",
+      "display_name": "Legal Form",
+      "filename": "legal_form.docx"
+    },
+    {
+      "key": "supporting_list",
+      "display_name": "Supporting Documents List",
+      "filename": "supporting_list.docx"
+    },
+    {
+      "key": "bailiff_sheet",
+      "display_name": "Bailiff Instruction Sheet",
+      "filename": "bailiff_sheet.docx"
+    }
+  ]
+}

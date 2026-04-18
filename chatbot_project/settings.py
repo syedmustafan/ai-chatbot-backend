@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'chatbot',
+    'docforge',
 ]
 
 MIDDLEWARE = [
@@ -112,10 +113,25 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# DocForge uploads: FileSystemStorage for dev, GCS in production.
+MEDIA_ROOT = config('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
+
+USE_GCS = config('USE_GCS', default=False, cast=bool)
+if USE_GCS:
+    GS_BUCKET_NAME = config('GS_BUCKET_NAME')
+    GS_DEFAULT_ACL = None            # uniform bucket-level access
+    GS_FILE_OVERWRITE = False
+    GS_QUERYSTRING_AUTH = True       # signed URLs for reads
+    GS_EXPIRATION = 3600
+    STORAGES = {
+        'default': {'BACKEND': 'storages.backends.gcloud.GoogleCloudStorage'},
+        'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+    }
+
 # CORS: allow frontend origins from env + any Vercel deployment (*.vercel.app)
 CORS_ALLOWED_ORIGINS = config(
     'ALLOWED_ORIGINS',
-    default='http://localhost:5174,http://localhost:3000',
+    default='http://localhost:5173,http://localhost:5174,http://localhost:3000',
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 # Allow all Vercel deployment URLs (production and preview) so CORS works without updating ALLOWED_ORIGINS
